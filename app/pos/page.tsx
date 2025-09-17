@@ -52,30 +52,51 @@ export default function POS() {
   );
 
   async function pagarConMercadoPago() {
-    try {
-      const resp = await fetch('/api/payments/mp/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: tempOrderId,          // luego: usar id real de Supabase
-          title: 'Pedido Maiztros',
-          totalMXN: total,
-          payer: {
-            name: customer.name || undefined,
-            email: customer.email || undefined,
-          }
-        })
-      });
-      const data = await resp.json();
-      if (data.url) {
-        window.location.href = data.url; // redirige a Mercado Pago
-      } else {
-        alert('No se pudo generar el link: ' + (data.error || ''));
-      }
-    } catch (e:any) {
-      alert('Error generando el link: ' + e.message);
+  try {
+    // 1) Guardar orden en Supabase y obtener id real
+    const respOrder = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer,
+        service,
+        deliveryZone,
+        notes,
+        totals: { subtotal, shipping, tip, total },
+        items, // opcional: lo puedes persistir en otra tabla si tu esquema lo contempla
+      })
+    });
+    const orderData = await respOrder.json();
+    if (!respOrder.ok) {
+      alert('No se pudo crear la orden: ' + (orderData.error || ''));
+      return;
     }
+    const orderId = orderData.id; // UUID real de Supabase
+
+    // 2) Crear preferencia de MP y redirigir
+    const resp = await fetch('/api/payments/mp/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId,            // <- usamos el UUID real como external_reference
+        title: 'Pedido Maiztros',
+        totalMXN: total,
+        payer: {
+          name: customer.name || undefined,
+          email: customer.email || undefined,
+        }
+      })
+    });
+    const data = await resp.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('No se pudo generar el link: ' + (data.error || ''));
+    }
+  } catch (e:any) {
+    alert('Error en pago: ' + e.message);
   }
+}
 
   return (
     <div className="space-y-4">
