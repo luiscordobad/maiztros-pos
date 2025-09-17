@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 function supabaseAdmin() {
@@ -8,14 +8,14 @@ function supabaseAdmin() {
   );
 }
 
-// PATCH /api/orders/:id/status  { status: 'queued'|'in_kitchen'|'ready'|'delivered' }
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+// PATCH /api/orders/:id/status
+// Body: { status: 'queued'|'in_kitchen'|'ready'|'delivered' }
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { status } = await req.json();
-    if (!status) return NextResponse.json({ error: 'status requerido' }, { status: 400 });
+    if (!status) {
+      return NextResponse.json({ error: 'status requerido' }, { status: 400 });
+    }
 
     const supa = supabaseAdmin();
     const { error } = await supa
@@ -24,7 +24,9 @@ export async function PATCH(
       .eq('id', params.id)
       .limit(1);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
