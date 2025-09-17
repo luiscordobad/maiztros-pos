@@ -17,9 +17,10 @@
     "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
-    "autoprefixer": "latest",
-    "postcss": "latest",
+    "@tailwindcss/postcss": "latest",
     "tailwindcss": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest",
     "typescript": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
