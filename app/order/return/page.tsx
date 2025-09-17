@@ -1,9 +1,11 @@
 'use client';
+
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function ReturnPage() {
+function ReturnContent() {
   const sp = useSearchParams();
-  const status = sp.get('status');     // success | pending | failure
+  const status = sp.get('status');   // success | pending | failure
   const orderId = sp.get('orderId');
 
   return (
@@ -15,5 +17,13 @@ export default function ReturnPage() {
         (También lo confirmamos por webhook aunque cierres esta página.)
       </p>
     </div>
+  );
+}
+
+export default function ReturnPage() {
+  return (
+    <Suspense fallback={<div className="card">Procesando pago…</div>}>
+      <ReturnContent />
+    </Suspense>
   );
 }
