@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 function supabaseAdmin() {
@@ -10,8 +10,9 @@ function supabaseAdmin() {
 
 // PATCH /api/orders/:id/status
 // Body: { status: 'queued'|'in_kitchen'|'ready'|'delivered' }
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, ctx: any) {
   try {
+    const { id } = ctx.params as { id: string };
     const { status } = await req.json();
     if (!status) {
       return NextResponse.json({ error: 'status requerido' }, { status: 400 });
@@ -21,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { error } = await supa
       .from('orders')
       .update({ status })
-      .eq('id', params.id)
+      .eq('id', id)
       .limit(1);
 
     if (error) {
