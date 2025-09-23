@@ -1,41 +1,81 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+
+import type { OrderRecord } from '@/types/order';
+
+const moneyFormatter = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  minimumFractionDigits: 2,
+});
 
 function OrderTrackingInner() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
-  const [order, setOrder] = useState<any>(null);
-  const [err, setErr] = useState<string|null>(null);
+  const [order, setOrder] = useState<OrderRecord | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const formattedTotal = useMemo(() => {
+    const total = order?.total_cents ?? 0;
+    return moneyFormatter.format(total / 100);
+  }, [order?.total_cents]);
 
   useEffect(() => {
-    if (!id) return;
-    let mounted = true;
-    (async () => {
+    if (!id) {
+      setErr('Pedido inválido');
+      setOrder(null);
+      return;
+    }
+
+    let active = true;
+
+    const load = async () => {
       try {
-        const r = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'No encontrada');
-        if (mounted) setOrder(j.order);
+        const response = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error || 'No encontrada');
+        }
+        if (active) {
+          setOrder(json.order as OrderRecord);
+          setErr(null);
+        }
       } catch (e: any) {
-        if (mounted) setErr(e.message);
+        if (active) {
+          setErr(e.message || 'Error al cargar la orden');
+        }
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    load();
+    const interval = setInterval(load, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [id]);
 
-  if (err) return <div className="card">Error: {err}</div>;
-  if (!order) return <div className="card">Cargando pedido…</div>;
+  if (err) return <div className='card'>Error: {err}</div>;
+  if (!order) return <div className='card'>Cargando pedido…</div>;
 
   return (
-    <div className="space-y-3">
-      <h1 className="text-2xl font-semibold">Pedido #{order.id}</h1>
-      <div className="card">
-        <p><b>Estado:</b> {order.status}</p>
-        <p><b>Pago:</b> {order.payment_status}</p>
-        <p><b>Total:</b> ${(order.total_cents ?? 0) / 100}</p>
-        <p><b>Notas:</b> {order.notes || '-'}</p>
+    <div className='space-y-3'>
+      <h1 className='text-2xl font-semibold'>Pedido #{order.id}</h1>
+      <div className='card'>
+        <p>
+          <b>Estado:</b> {order.status}
+        </p>
+        <p>
+          <b>Pago:</b> {order.payment_status}
+        </p>
+        <p>
+          <b>Total:</b> {formattedTotal}
+        </p>
+        <p>
+          <b>Notas:</b> {order.notes || '-'}
+        </p>
       </div>
     </div>
   );
@@ -43,7 +83,7 @@ function OrderTrackingInner() {
 
 export default function OrderTrackingPage() {
   return (
-    <Suspense fallback={<div className="card">Cargando…</div>}>
+    <Suspense fallback={<div className='card'>Cargando…</div>}>
       <OrderTrackingInner />
     </Suspense>
   );
