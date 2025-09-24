@@ -15,14 +15,13 @@ function supabaseAdmin() {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type RouteContext = {
-  params?: {
-    id?: string;
-  };
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
-    const id = context.params?.id;
+    const params = await context.params;
+    const id = params?.id;
     if (!id || !UUID_REGEX.test(id)) {
       return NextResponse.json({ error: 'id inválido' }, { status: 400 });
     }
