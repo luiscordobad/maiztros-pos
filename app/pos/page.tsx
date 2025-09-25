@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
 
@@ -27,6 +27,16 @@ export default function POS() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
+
+  if (!idempotencyKeyRef.current) {
+    idempotencyKeyRef.current =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+  }
+
+  const idempotencyKey = idempotencyKeyRef.current!;
 
   function upsertItem(next: OrderItem) {
     setItems((prev) => {
@@ -103,7 +113,10 @@ export default function POS() {
     try {
       const response = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-idempotency-key': idempotencyKey,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -111,12 +124,16 @@ export default function POS() {
       if (!response.ok) {
         throw new Error(json.error || 'No se pudo crear la orden');
       }
-      setOrderId(json.id);
-      return json.id as string;
+      const newOrderId = typeof json.order_id === 'string' ? json.order_id : undefined;
+      if (!json.ok || !newOrderId) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+      setOrderId(newOrderId);
+      return newOrderId;
     } finally {
       setIsPersisting(false);
     }
-  }, [customer, deliveryZone, items, notes, orderId, service, totals]);
+  }, [customer, deliveryZone, idempotencyKey, items, notes, orderId, service, totals]);
 
   const pagarConMercadoPago = useCallback(async () => {
     try {
@@ -141,8 +158,9 @@ export default function POS() {
       } else {
         throw new Error(data.error || 'No se pudo generar el link de pago');
       }
-    } catch (e: any) {
-      alert('Error en pago: ' + (e.message || 'Error desconocido'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      alert('Error en pago: ' + message);
     } finally {
       setIsPaying(false);
     }

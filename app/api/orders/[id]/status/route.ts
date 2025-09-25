@@ -15,15 +15,15 @@ function supabaseAdmin() {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_STATUS: ReadonlyArray<OrderStatus> = ['queued', 'in_kitchen', 'ready', 'delivered'];
 
+type RouteParams = { id: string };
+
 type RouteContext = {
-  params?: {
-    id?: string;
-  };
+  params: Promise<RouteParams>;
 };
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    const id = context.params?.id;
+    const { id } = await context.params;
     if (!id || !UUID_REGEX.test(id)) {
       return NextResponse.json({ error: 'id inválido' }, { status: 400 });
     }
@@ -55,7 +55,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

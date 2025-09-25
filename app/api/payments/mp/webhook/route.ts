@@ -62,8 +62,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    console.error('MP webhook error:', e);
+  } catch (error) {
+    console.error('MP webhook error:', error);
     // Aun así responde 200 para evitar tormenta de reintentos si es un bug temporal
     return NextResponse.json({ ok: true });
   }

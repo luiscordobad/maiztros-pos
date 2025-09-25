@@ -1,18 +1,57 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-type Status = 'queued'|'in_kitchen'|'ready'|'delivered';
+type Status = 'queued' | 'in_kitchen' | 'ready' | 'delivered';
+type PaymentStatus = 'pending' | 'paid' | 'failed';
+
+type KdsOrder = {
+  id: string;
+  status: Status;
+  created_at: string;
+  customer_name: string | null;
+  payment_status: PaymentStatus;
+  total_cents: number | null;
+};
+
+type OrdersResponse = {
+  orders?: unknown;
+  error?: string;
+};
+
+function isStatus(value: unknown): value is Status {
+  return value === 'queued' || value === 'in_kitchen' || value === 'ready' || value === 'delivered';
+}
+
+function isPaymentStatus(value: unknown): value is PaymentStatus {
+  return value === 'pending' || value === 'paid' || value === 'failed';
+}
+
+function isKdsOrder(value: unknown): value is KdsOrder {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.created_at === 'string' &&
+    (candidate.customer_name === null || typeof candidate.customer_name === 'string') &&
+    (candidate.total_cents === null || typeof candidate.total_cents === 'number') &&
+    isStatus(candidate.status) &&
+    isPaymentStatus(candidate.payment_status)
+  );
+}
 
 export default function KDS() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<KdsOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     try {
       const r = await fetch('/api/orders/kds', { cache: 'no-store' });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Error KDS');
-      setOrders(j.orders || []);
+      const j: OrdersResponse = await r.json();
+      if (!r.ok) {
+        throw new Error(j.error || 'Error KDS');
+      }
+      const payload = Array.isArray(j.orders) ? j.orders.filter(isKdsOrder) : [];
+      setOrders(payload);
     } catch (e) {
       console.error(e);
     } finally {

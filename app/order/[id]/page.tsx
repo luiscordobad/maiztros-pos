@@ -5,6 +5,23 @@ import { useParams } from 'next/navigation';
 
 import type { OrderRecord } from '@/types/order';
 
+type OrderResponse = {
+  order?: unknown;
+  error?: string;
+};
+
+function isOrderRecord(value: unknown): value is OrderRecord {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.status === 'string' &&
+    typeof candidate.payment_status === 'string' &&
+    typeof candidate.total_cents === 'number' &&
+    ('notes' in candidate ? candidate.notes === null || typeof candidate.notes === 'string' : true)
+  );
+}
+
 const moneyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN',
@@ -34,17 +51,18 @@ function OrderTrackingInner() {
     const load = async () => {
       try {
         const response = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
-        const json = await response.json();
+        const json: OrderResponse = await response.json();
         if (!response.ok) {
           throw new Error(json.error || 'No encontrada');
         }
         if (active) {
-          setOrder(json.order as OrderRecord);
+          setOrder(isOrderRecord(json.order) ? json.order : null);
           setErr(null);
         }
-      } catch (e: any) {
+      } catch (error) {
         if (active) {
-          setErr(e.message || 'Error al cargar la orden');
+          const message = error instanceof Error ? error.message : 'Error al cargar la orden';
+          setErr(message);
         }
       }
     };
