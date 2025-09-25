@@ -50,10 +50,6 @@
   }
 }
 
-* {
-  border-color: hsl(var(--border));
-}
-
 body {
   margin: 0;
   background: hsl(var(--background));
@@ -94,7 +90,7 @@ a:hover {
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
