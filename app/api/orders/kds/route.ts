@@ -24,7 +24,8 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ orders: data });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

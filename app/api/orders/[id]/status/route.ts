@@ -55,7 +55,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

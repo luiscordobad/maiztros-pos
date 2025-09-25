@@ -43,7 +43,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ order: data as OrderRecord });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
