@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+
+import { createSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 
 const MP_API = 'https://api.mercadopago.com';
-
-// Supabase admin (service role) solo en servidor
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
 
 // MP manda distinto formato según configuración: topic/type + id / data.id.
 // Soportamos ambos.
@@ -46,7 +39,7 @@ export async function GET(req: Request) {
     if (payment.status === 'approved') {
       const externalRef = payment.external_reference as string | null; // aquí viene tu orderId
       if (externalRef) {
-        const supa = supabaseAdmin();
+        const supa = createSupabaseServiceRoleClient();
         // Marca la orden como pagada
         const { error } = await supa
           .from('orders')
@@ -62,8 +55,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    console.error('MP webhook error:', e);
+  } catch (error) {
+    console.error('MP webhook error:', error);
     // Aun así responde 200 para evitar tormenta de reintentos si es un bug temporal
     return NextResponse.json({ ok: true });
   }
