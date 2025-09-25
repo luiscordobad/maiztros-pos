@@ -36,21 +36,24 @@ export async function POST(request: Request, context: RouteParams) {
       return NextResponse.json({ error: 'Ingresa un código' }, { status: 400 });
     }
 
-    const { data: order, error: orderError } = await supabaseAdmin
+    const { data: orderData, error: orderError } = await supabaseAdmin
       .from('orders')
       .select('subtotal, total')
       .eq('id', orderId)
-      .single<OrderFinancials>();
+      .maybeSingle();
+    const order = orderData as OrderFinancials | null;
     if (orderError || !order) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
     }
 
-    const { data: coupon, error } = await supabaseAdmin
+    const { data: couponData, error } = await supabaseAdmin
       .from('coupons')
       .select('code, type, value, min_total, starts_at, ends_at')
       .eq('code', code)
       .eq('active', true)
-      .maybeSingle<CouponRow>();
+      .maybeSingle();
+
+    const coupon = couponData as CouponRow | null;
 
     if (error || !coupon) {
       return NextResponse.json({ error: 'Cupón inválido' }, { status: 400 });
