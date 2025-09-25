@@ -9,6 +9,8 @@ import type {
 } from '@/types/supabase';
 
 type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
+type AuditLogInsert = Database['public']['Tables']['audit_logs']['Insert'];
+type AuditLogUpdate = Database['public']['Tables']['audit_logs']['Update'];
 
 type MaybeSingle<T> = {
   data: T | null;
@@ -210,13 +212,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Reserva la key en audit_logs para prevenir carreras
+    const auditInsertPayload: AuditLogInsert = {
+      type: CREATE_ORDER_EVENT,
+      idempotency_key: idempotencyKey,
+      payload: { request: parsed.data },
+    };
+
     const auditInsert = await supa
       .from('audit_logs')
-      .insert({
-        type: CREATE_ORDER_EVENT,
-        idempotency_key: idempotencyKey,
-        payload: { request: parsed.data },
-      })
+      .insert<AuditLogInsert>(auditInsertPayload)
       .select('id')
       .single();
 
@@ -289,15 +293,17 @@ export async function POST(req: NextRequest) {
 
     const responsePayload: AuditResponsePayload = { ok: true, order_id: orderId };
 
+    const auditUpdatePayload: AuditLogUpdate = {
+      order_id: orderId,
+      payload: {
+        request: parsed.data,
+        response: responsePayload,
+      },
+    };
+
     const auditUpdate = await supa
       .from('audit_logs')
-      .update({
-        order_id: orderId,
-        payload: {
-          request: parsed.data,
-          response: responsePayload,
-        },
-      })
+      .update<AuditLogUpdate>(auditUpdatePayload)
       .eq('id', auditId);
 
     if (auditUpdate.error) {
