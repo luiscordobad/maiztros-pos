@@ -100,6 +100,46 @@ export type Database = {
           }
         ];
       };
+      kds_status_history: {
+        Row: {
+          id: string;
+          order_id: string | null;
+          from_status:
+            | Database["public"]["Enums"]["order_status"]
+            | null;
+          to_status: Database["public"]["Enums"]["order_status"];
+          changed_by: string | null;
+          changed_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id?: string | null;
+          from_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null;
+          to_status: Database["public"]["Enums"]["order_status"];
+          changed_by?: string | null;
+          changed_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string | null;
+          from_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null;
+          to_status?: Database["public"]["Enums"]["order_status"];
+          changed_by?: string | null;
+          changed_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kds_status_history_order_id_fkey";
+            columns: ["order_id"];
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       order_items: {
         Row: {
           id: string;
