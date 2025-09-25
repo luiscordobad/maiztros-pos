@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
+import type { Database } from '@/types/supabase';
+
+type OrderChannel = Database['public']['Enums']['order_channel'];
 
 interface OrderItemPayload {
   sku: string;
@@ -11,7 +14,7 @@ interface OrderItemPayload {
 }
 
 interface OrderPayload {
-  channel: string;
+  channel: OrderChannel;
   customer?: {
     phone?: string;
     name?: string;
@@ -23,7 +26,7 @@ interface OrderPayload {
   total: number;
 }
 
-const allowedChannels = ['counter', 'whatsapp', 'rappi', 'other'];
+const allowedChannels: OrderChannel[] = ['counter', 'whatsapp', 'rappi', 'other'];
 
 const parseItems = (items: OrderItemPayload[]): OrderItemPayload[] => {
   if (!Array.isArray(items) || items.length === 0) {
