@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getErrorMessage } from '@/lib/utils';
+
 const MP_API = 'https://api.mercadopago.com';
 
 // Supabase admin (service role) solo en servidor
@@ -62,9 +64,9 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    console.error('MP webhook error:', e);
+  } catch (error: unknown) {
+    console.error('MP webhook error:', error);
     // Aun así responde 200 para evitar tormenta de reintentos si es un bug temporal
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, error: getErrorMessage(error, 'error') });
   }
 }

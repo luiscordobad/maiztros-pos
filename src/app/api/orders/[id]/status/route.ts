@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getErrorMessage } from '@/lib/utils';
 import type { OrderStatus } from '@/types/order';
 
 function supabaseAdmin() {
@@ -55,7 +56,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error, 'error') }, { status: 500 });
   }
 }

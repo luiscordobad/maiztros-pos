@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
+import { getErrorMessage } from '@/lib/utils';
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 type Service = OrderPayload['service'] | null;
@@ -141,8 +142,8 @@ export default function POS() {
       } else {
         throw new Error(data.error || 'No se pudo generar el link de pago');
       }
-    } catch (e: any) {
-      alert('Error en pago: ' + (e.message || 'Error desconocido'));
+    } catch (error: unknown) {
+      alert('Error en pago: ' + getErrorMessage(error, 'Error desconocido'));
     } finally {
       setIsPaying(false);
     }

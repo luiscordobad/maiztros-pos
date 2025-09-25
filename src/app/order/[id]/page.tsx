@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 import type { OrderRecord } from '@/types/order';
+import { getErrorMessage } from '@/lib/utils';
 
 const moneyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -42,9 +43,9 @@ function OrderTrackingInner() {
           setOrder(json.order as OrderRecord);
           setErr(null);
         }
-      } catch (e: any) {
+      } catch (error: unknown) {
         if (active) {
-          setErr(e.message || 'Error al cargar la orden');
+          setErr(getErrorMessage(error, 'Error al cargar la orden'));
         }
       }
     };

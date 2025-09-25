@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getErrorMessage } from '@/lib/utils';
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
 
 function supabaseAdmin() {
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ id: data.id });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error, 'error') }, { status: 500 });
   }
 }

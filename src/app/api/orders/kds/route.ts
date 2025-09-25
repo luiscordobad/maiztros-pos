@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getErrorMessage } from '@/lib/utils';
+
 function supabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,7 +26,7 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ orders: data });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error, 'error') }, { status: 500 });
   }
 }

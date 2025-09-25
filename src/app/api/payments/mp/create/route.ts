@@ -3,6 +3,8 @@
 
 import { NextResponse } from 'next/server';
 
+import { getErrorMessage } from '@/lib/utils';
+
 const MP_API = 'https://api.mercadopago.com';
 
 export async function POST(req: Request) {
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
     // Links posibles: init_point (prod) y sandbox_init_point (sandbox)
     const url = data.init_point || data.sandbox_init_point;
     return NextResponse.json({ preferenceId: data.id, url });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error, 'error') }, { status: 500 });
   }
 }

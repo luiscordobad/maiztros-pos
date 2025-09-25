@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getErrorMessage } from '@/lib/utils';
 import type { OrderRecord } from '@/types/order';
 
 function supabaseAdmin() {
@@ -43,7 +44,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ order: data as OrderRecord });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error, 'error') }, { status: 500 });
   }
 }
