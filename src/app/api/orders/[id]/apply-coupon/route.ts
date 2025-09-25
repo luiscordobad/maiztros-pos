@@ -20,8 +20,16 @@ type OrderFinancials = {
   total: number | string;
 };
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+type RouteParams = { params: Promise<{ id: string }> };
+
+export async function POST(request: Request, context: RouteParams) {
   try {
+    const params = (await context.params) ?? {};
+    const orderId = params.id;
+    if (!orderId) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
+    }
+
     const body = (await request.json()) as ApplyCouponPayload;
     const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
     if (!code) {
@@ -31,7 +39,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .select('subtotal, total')
-      .eq('id', params.id)
+      .eq('id', orderId)
       .single<OrderFinancials>();
     if (orderError || !order) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
@@ -79,13 +87,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { error: updateError } = await supabaseAdmin
       .from('orders')
       .update({ discount, total })
-      .eq('id', params.id);
+      .eq('id', orderId);
 
     if (updateError) {
       throw new Error(updateError.message);
     }
 
-    await logAudit({ actor: null, action: 'DISCOUNT', entity: 'order', entity_id: params.id, meta: { code, discount } });
+    await logAudit({ actor: null, action: 'DISCOUNT', entity: 'order', entity_id: orderId, meta: { code, discount } });
 
     return NextResponse.json({ code, discount_cents: Math.round(discount * 100), total_cents: Math.round(total * 100) });
   } catch (error: unknown) {

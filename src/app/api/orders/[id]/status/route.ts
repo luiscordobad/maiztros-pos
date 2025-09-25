@@ -8,8 +8,16 @@ type UpdateStatusPayload = {
   status?: unknown;
 };
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+type RouteParams = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: Request, context: RouteParams) {
   try {
+    const params = (await context.params) ?? {};
+    const orderId = params.id;
+    if (!orderId) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
+    }
+
     const body = (await request.json()) as UpdateStatusPayload;
     const status = typeof body.status === 'string' ? body.status : '';
     if (!allowedStatus.includes(status)) {
@@ -24,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: prev, error: prevError } = await supabaseAdmin
       .from('orders')
       .select('status')
-      .eq('id', params.id)
+      .eq('id', orderId)
       .single<{ status: string }>();
 
     if (prevError || !prev) {
@@ -34,17 +42,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { error } = await supabaseAdmin
       .from('orders')
       .update({ status, ...timestamps })
-      .eq('id', params.id);
+      .eq('id', orderId);
 
     if (error) throw new Error(error.message);
 
     await supabaseAdmin.from('kds_status_history').insert({
-      order_id: params.id,
+      order_id: orderId,
       from_status: prev.status,
       to_status: status,
     });
 
-    await logAudit({ actor: null, action: 'STATUS_CHANGE', entity: 'order', entity_id: params.id, meta: { from: prev.status, to: status } });
+    await logAudit({ actor: null, action: 'STATUS_CHANGE', entity: 'order', entity_id: orderId, meta: { from: prev.status, to: status } });
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
