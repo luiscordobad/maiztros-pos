@@ -20,12 +20,12 @@ type OrderFinancials = {
   total: number | string;
 };
 
-type RouteParams = { params: Promise<{ id: string }> };
+type RouteParams = { params: Promise<{ id?: string } | undefined> };
 
 export async function POST(request: Request, context: RouteParams) {
   try {
-    const params = (await context.params) ?? {};
-    const orderId = params.id;
+    const params = await context.params;
+    const orderId = params?.id;
     if (!orderId) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
     }
