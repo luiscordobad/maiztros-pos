@@ -7,7 +7,7 @@ import {
   fetchSalesByHour,
   fetchTopProducts,
 } from '@/lib/dashboard/queries';
-import type { DashboardFilters } from '@/lib/dashboard/types';
+import type { DashboardFilters, OrderChannel, OrderStatus } from '@/lib/dashboard/types';
 
 type RawDashboardFilters = {
   range?: {
@@ -18,6 +18,15 @@ type RawDashboardFilters = {
   status?: unknown;
 };
 
+const allowedChannels: readonly OrderChannel[] = ['counter', 'whatsapp', 'rappi', 'other'];
+const allowedStatus: readonly OrderStatus[] = ['pending', 'in_progress', 'ready', 'delivered'];
+
+const isOrderChannel = (value: unknown): value is OrderChannel =>
+  typeof value === 'string' && allowedChannels.includes(value as OrderChannel);
+
+const isOrderStatus = (value: unknown): value is OrderStatus =>
+  typeof value === 'string' && allowedStatus.includes(value as OrderStatus);
+
 const validateFilters = (body: unknown): DashboardFilters => {
   if (typeof body !== 'object' || body === null) {
     throw new Error('Rango inválido');
@@ -26,8 +35,8 @@ const validateFilters = (body: unknown): DashboardFilters => {
   if (!range?.from || !range?.to) {
     throw new Error('Rango inválido');
   }
-  const parsedChannels = Array.isArray(channels) ? channels.filter((channel): channel is string => typeof channel === 'string') : [];
-  const parsedStatus = typeof status === 'string' && status ? status : null;
+  const parsedChannels = Array.isArray(channels) ? channels.filter(isOrderChannel) : [];
+  const parsedStatus = isOrderStatus(status) ? status : null;
   return {
     range: { from: String(range.from), to: String(range.to) },
     channels: parsedChannels,

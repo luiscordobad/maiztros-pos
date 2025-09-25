@@ -1,7 +1,12 @@
+import type { Database } from '@/types/supabase';
+
+export type OrderChannel = Database['public']['Enums']['order_channel'];
+export type OrderStatus = Exclude<Database['public']['Enums']['order_status'], 'canceled'>;
+
 export interface DashboardFilters {
   range: { from: string; to: string };
-  channels: string[];
-  status: string | null;
+  channels: OrderChannel[];
+  status: OrderStatus | null;
 }
 
 export interface SalesByHourPoint {
@@ -30,12 +35,14 @@ export interface HeatmapRow {
   totalSales: number;
 }
 
+export type OrderStatusAll = Database['public']['Enums']['order_status'];
+
 export interface OrderTableRow {
   id: string;
   createdAt: string;
   ticketNo: number | null;
-  channel: string;
-  status: string;
+  channel: OrderChannel;
+  status: OrderStatusAll;
   total: number;
   paymentMethod: string | null;
 }

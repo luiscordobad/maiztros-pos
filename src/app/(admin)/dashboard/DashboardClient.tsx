@@ -19,19 +19,23 @@ import type {
   DashboardFilters,
   HeatmapRow,
   KpiSummary,
+  OrderChannel,
+  OrderStatus,
   OrderTableRow,
   SalesByHourPoint,
   TopProductRow,
 } from '@/lib/dashboard/types';
 
-const channelsOptions = [
+const channelsOptions: Array<{ value: OrderChannel; label: string }> = [
   { value: 'counter', label: 'Mostrador' },
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'rappi', label: 'Rappi' },
   { value: 'other', label: 'Otro' },
 ];
 
-const statusOptions = [
+type StatusOptionValue = '' | OrderStatus;
+
+const statusOptions: Array<{ value: StatusOptionValue; label: string }> = [
   { value: '', label: 'Todos excepto cancelados' },
   { value: 'pending', label: 'Pendiente' },
   { value: 'in_progress', label: 'En progreso' },
@@ -57,8 +61,8 @@ const todayRange = (): DateRangeValue => {
 
 export function DashboardClient({ initial }: { initial: DashboardPayload | null }) {
   const [range, setRange] = useState<DateRangeValue>(() => todayRange());
-  const [channels, setChannels] = useState<string[]>(channelsOptions.map((c) => c.value));
-  const [status, setStatus] = useState<string>('');
+  const [channels, setChannels] = useState<OrderChannel[]>(channelsOptions.map((c) => c.value));
+  const [status, setStatus] = useState<StatusOptionValue>('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<DashboardPayload | null>(initial);
@@ -107,7 +111,7 @@ export function DashboardClient({ initial }: { initial: DashboardPayload | null 
     });
   }, [data, search]);
 
-  const toggleChannel = (value: string) => {
+  const toggleChannel = (value: OrderChannel) => {
     setChannels((prev) => (prev.includes(value) ? prev.filter((ch) => ch !== value) : [...prev, value]));
   };
 
@@ -122,7 +126,10 @@ export function DashboardClient({ initial }: { initial: DashboardPayload | null 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <Label>Estado</Label>
-              <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+              <Select
+                value={status}
+                onChange={(event) => setStatus(event.target.value as StatusOptionValue)}
+              >
                 {statusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}

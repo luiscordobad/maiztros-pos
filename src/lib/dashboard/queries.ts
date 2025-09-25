@@ -5,14 +5,17 @@ import type {
   DashboardFilters,
   HeatmapRow,
   KpiSummary,
+  OrderChannel,
+  OrderStatusAll,
   OrderTableRow,
   SalesByHourPoint,
   TopProductRow,
 } from './types';
 
-const defaultChannels = ['counter', 'whatsapp', 'rappi', 'other'];
+const defaultChannels: OrderChannel[] = ['counter', 'whatsapp', 'rappi', 'other'];
 
-const normalizeChannels = (channels: string[]) => (channels.length ? channels : defaultChannels);
+const normalizeChannels = (channels: OrderChannel[]) =>
+  channels.length ? channels : defaultChannels;
 
 const rangePayload = (range: { from: string; to: string }) => ({
   from_ts: formatISO(parseISO(range.from)),
@@ -43,8 +46,8 @@ type OrdersTableRowData = {
   id: string;
   created_at: string;
   ticket_no: number | null;
-  channel: string;
-  status: string;
+  channel: OrderChannel;
+  status: OrderStatusAll;
   total: number | string | null;
   payment_method: string | null;
 };

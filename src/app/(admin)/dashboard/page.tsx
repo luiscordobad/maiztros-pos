@@ -1,8 +1,9 @@
 import { addDays, startOfDay } from 'date-fns';
 import { DashboardClient } from './DashboardClient';
 import { fetchCohorts, fetchHeatmap, fetchKpis, fetchOrdersTable, fetchSalesByHour, fetchTopProducts } from '@/lib/dashboard/queries';
+import type { DashboardFilters, OrderChannel } from '@/lib/dashboard/types';
 
-const defaultChannels = ['counter', 'whatsapp', 'rappi', 'other'];
+const defaultChannels: OrderChannel[] = ['counter', 'whatsapp', 'rappi', 'other'];
 
 const todayRange = () => {
   const now = new Date();
@@ -13,7 +14,7 @@ const todayRange = () => {
 
 export default async function DashboardPage() {
   const range = todayRange();
-  const filters = { range, channels: defaultChannels, status: null } as const;
+  const filters: DashboardFilters = { range, channels: defaultChannels, status: null };
   let initial = null;
   try {
     const [kpis, sales, topProducts, orders, cohorts, heatmap] = await Promise.all([
