@@ -283,7 +283,74 @@ export type Database = {
       };
     };
     Views: {};
-    Functions: {};
+    Functions: {
+      dashboard_sales_by_hour: {
+        Args: {
+          from_ts: string;
+          to_ts: string;
+          channels?: Database["public"]["Enums"]["order_channel"][] | null;
+          status_filter?: Database["public"]["Enums"]["order_status"] | null;
+        };
+        Returns: {
+          bucket: string;
+          sales: number;
+          orders: number;
+        }[];
+      };
+      dashboard_top_products: {
+        Args: {
+          from_ts: string;
+          to_ts: string;
+          channels?: Database["public"]["Enums"]["order_channel"][] | null;
+          status_filter?: Database["public"]["Enums"]["order_status"] | null;
+        };
+        Returns: {
+          sku: string;
+          name: string;
+          units: number;
+          revenue: number;
+        }[];
+      };
+      dashboard_kpis: {
+        Args: {
+          from_ts: string;
+          to_ts: string;
+          channels?: Database["public"]["Enums"]["order_channel"][] | null;
+          status_filter?: Database["public"]["Enums"]["order_status"] | null;
+        };
+        Returns: Json;
+      };
+      dashboard_orders_table: {
+        Args: {
+          from_ts: string;
+          to_ts: string;
+          channels?: Database["public"]["Enums"]["order_channel"][] | null;
+          status_filter?: Database["public"]["Enums"]["order_status"] | null;
+        };
+        Returns: {
+          id: string;
+          created_at: string;
+          ticket_no: number | null;
+          channel: Database["public"]["Enums"]["order_channel"];
+          status: Database["public"]["Enums"]["order_status"];
+          total: number;
+          payment_method: string | null;
+        }[];
+      };
+      dashboard_weekly_cohorts: {
+        Args: {
+          from_ts: string;
+          to_ts: string;
+          channels?: Database["public"]["Enums"]["order_channel"][] | null;
+          status_filter?: Database["public"]["Enums"]["order_status"] | null;
+        };
+        Returns: {
+          week: string;
+          new_customers: number;
+          returning_customers: number;
+        }[];
+      };
+    };
     Enums: {
       order_channel: "counter" | "whatsapp" | "rappi" | "other";
       order_status: "pending" | "in_progress" | "ready" | "delivered" | "canceled";
