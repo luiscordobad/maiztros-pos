@@ -1,3 +1,4 @@
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
@@ -46,12 +47,15 @@ export async function POST(request: Request, context: RouteParams) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
     }
 
-    const { data: couponData, error } = await supabaseAdmin
+    const looseAdmin = supabaseAdmin as SupabaseClient<Record<string, unknown>>;
+    const couponResponse = (await looseAdmin
       .from('coupons')
       .select('code, type, value, min_total, starts_at, ends_at')
       .eq('code', code)
       .eq('active', true)
-      .maybeSingle();
+      .maybeSingle()) as { data: CouponRow | null; error: PostgrestError | null };
+
+    const { data: couponData, error } = couponResponse;
 
     const coupon = couponData as CouponRow | null;
 
