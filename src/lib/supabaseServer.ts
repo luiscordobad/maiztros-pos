@@ -14,8 +14,8 @@ const mapOptions = (name: string, value: string, options: CookieOptions = {}) =>
   ...options,
 });
 
-export const createSupabaseServerClient = () => {
-  const store = cookies();
+export const createSupabaseServerClient = async () => {
+  const store = await cookies();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
@@ -33,6 +33,6 @@ export const createSupabaseServerClient = () => {
 
 export const supabaseServer = createSupabaseServerClient;
 
-export type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
+export type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 export default createSupabaseServerClient;
