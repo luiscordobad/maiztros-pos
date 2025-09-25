@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { OrderStatus } from '@/types/order';
 
-type SupabaseAdminClient = SupabaseClient<unknown>;
+type SupabaseAdminClient = SupabaseClient<Record<string, unknown>>;
+
+type OrderStatusLiteRow = {
+  status: OrderStatus;
+  paid_at: string | null;
+};
 
 function supabaseAdmin(): SupabaseAdminClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,7 +50,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       .from('orders')
       .select('status, paid_at')
       .eq('id', id)
-      .maybeSingle();
+      .maybeSingle<OrderStatusLiteRow>();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
