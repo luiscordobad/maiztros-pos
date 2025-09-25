@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
-import type { Database } from '@/types/supabase';
+import type { Database, Json } from '@/types/supabase';
 
 type OrderChannel = Database['public']['Enums']['order_channel'];
 
@@ -28,7 +28,27 @@ interface OrderPayload {
 
 const allowedChannels: OrderChannel[] = ['counter', 'whatsapp', 'rappi', 'other'];
 
-const parseItems = (items: OrderItemPayload[]): OrderItemPayload[] => {
+type OrderItemInsert = Omit<Database['public']['Tables']['order_items']['Insert'], 'order_id'>;
+
+const toJson = (value: unknown): Json => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => toJson(entry));
+  }
+  if (typeof value === 'object') {
+    const result: Record<string, Json | undefined> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      result[key] = toJson(entry);
+    }
+    return result;
+  }
+  throw new Error('Modificadores inválidos');
+};
+
+const parseItems = (items: OrderItemPayload[]): OrderItemInsert[] => {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Debes agregar artículos al pedido');
   }
@@ -38,7 +58,13 @@ const parseItems = (items: OrderItemPayload[]): OrderItemPayload[] => {
     if (!Number.isFinite(qty) || qty <= 0) throw new Error('Cantidad inválida');
     const price = Number(item.unit_price ?? 0);
     if (!Number.isFinite(price) || price < 0) throw new Error('Precio inválido');
-    return { ...item, qty, unit_price: price, modifiers: item.modifiers ?? [] };
+    return {
+      sku: item.sku,
+      name: item.name,
+      qty,
+      unit_price: price,
+      modifiers: toJson(item.modifiers ?? []),
+    };
   });
 };
 
@@ -96,16 +122,9 @@ export async function POST(request: Request) {
 
     const orderId = order.id;
 
-    const { error: itemsError } = await supabaseAdmin.from('order_items').insert(
-      items.map((item) => ({
-        order_id: orderId,
-        sku: item.sku,
-        name: item.name,
-        qty: item.qty,
-        unit_price: item.unit_price,
-        modifiers: item.modifiers ?? [],
-      }))
-    );
+    const { error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .insert(items.map((item) => ({ ...item, order_id: orderId })));
 
     if (itemsError) {
       throw new Error(itemsError.message);
