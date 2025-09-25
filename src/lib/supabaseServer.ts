@@ -6,18 +6,17 @@ import { getSupabaseConfig } from './supabaseConfig';
 import { mexicoCityNowISO } from './timeMx';
 
 export async function createSupabaseServerClient(): Promise<SupabaseClient> {
-  const cookieStore = await cookies();
   const { url, anonKey } = getSupabaseConfig();
 
   return createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      async get(name: string) {
+        return (await cookies()).get(name)?.value;
       },
-      set() {
+      async set() {
         // noop for RSC/edge usage. Implement when mutating auth state serverside.
       },
-      remove() {
+      async remove() {
         // noop
       },
     },
