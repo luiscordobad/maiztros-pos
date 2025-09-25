@@ -3,6 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
 
+type AuditResponsePayload = { ok: true; order_id: string };
+type AuditPayload = {
+  request?: OrderPayload;
+  response?: AuditResponsePayload;
+} | null;
+
+type AuditLogRow = {
+  id: string;
+  order_id: string | null;
+  payload: AuditPayload;
+};
+
+type MaybeSingle<T> = {
+  data: T | null;
+  error: { message: string; code?: string } | null;
+};
+
 function supabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,6 +32,9 @@ function supabaseAdmin() {
 const ALLOWED_SERVICES: ReadonlyArray<OrderPayload['service']> = ['dine_in', 'pickup', 'delivery'];
 const ALLOWED_DELIVERY_ZONES: ReadonlyArray<NonNullable<OrderPayload['deliveryZone']>> = ['zibata', 'fuera'];
 const ALLOWED_SLOTS: ReadonlyArray<OrderItem['slot']> = ['base', 'papas_o_sopa', 'toppings', 'drink'];
+
+const IDEMPOTENCY_HEADER = 'x-idempotency-key';
+const CREATE_ORDER_EVENT = 'CREATE_ORDER';
 
 const isMoney = (value: unknown): value is Money => {
   if (!value || typeof value !== 'object') return false;
@@ -100,7 +120,10 @@ const parseOrderPayload = (body: unknown): { data?: OrderPayload; error?: string
 
   const deliveryZoneValue = raw.deliveryZone;
   if (service === 'delivery') {
-    if (typeof deliveryZoneValue !== 'string' || !ALLOWED_DELIVERY_ZONES.includes(deliveryZoneValue as NonNullable<OrderPayload['deliveryZone']>)) {
+    if (
+      typeof deliveryZoneValue !== 'string' ||
+      !ALLOWED_DELIVERY_ZONES.includes(deliveryZoneValue as NonNullable<OrderPayload['deliveryZone']>)
+    ) {
       return { error: 'Zona de entrega requerida' };
     }
   }
@@ -111,7 +134,9 @@ const parseOrderPayload = (body: unknown): { data?: OrderPayload; error?: string
     service: service as OrderPayload['service'],
     totals: rawTotals,
     items,
-    ...(service === 'delivery' && typeof deliveryZoneValue === 'string' && ALLOWED_DELIVERY_ZONES.includes(deliveryZoneValue as NonNullable<OrderPayload['deliveryZone']>)
+    ...(service === 'delivery' &&
+    typeof deliveryZoneValue === 'string' &&
+    ALLOWED_DELIVERY_ZONES.includes(deliveryZoneValue as NonNullable<OrderPayload['deliveryZone']>)
       ? { deliveryZone: deliveryZoneValue as NonNullable<OrderPayload['deliveryZone']> }
       : {}),
     ...(typeof notesValue === 'string' && notesValue.trim() ? { notes: notesValue.trim() } : {}),
@@ -120,18 +145,91 @@ const parseOrderPayload = (body: unknown): { data?: OrderPayload; error?: string
   return { data: payload };
 };
 
+function normalizeIdempotencyKey(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 200) {
+    return trimmed.slice(0, 200);
+  }
+  return trimmed;
+}
+
+async function fetchExistingLog(key: string): Promise<AuditLogRow | null> {
+  const supa = supabaseAdmin();
+  const { data, error } = (await supa
+    .from('audit_logs')
+    .select('id, order_id, payload')
+    .eq('type', CREATE_ORDER_EVENT)
+    .eq('idempotency_key', key)
+    .maybeSingle()) as MaybeSingle<AuditLogRow>;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const rawKey = req.headers.get(IDEMPOTENCY_HEADER);
+    const idempotencyKey = normalizeIdempotencyKey(rawKey);
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'Falta encabezado de idempotencia' }, { status: 400 });
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = parseOrderPayload(body);
     if (!parsed.data) {
       return NextResponse.json({ error: parsed.error ?? 'Datos inválidos' }, { status: 400 });
     }
 
-    const { customer, service, deliveryZone, notes, totals } = parsed.data;
+    // Verifica si ya existe una respuesta previa para la misma key
+    const existingLog = await fetchExistingLog(idempotencyKey);
+    if (existingLog?.order_id) {
+      const existingResponse = existingLog.payload?.response;
+      if (existingResponse) {
+        return NextResponse.json(existingResponse);
+      }
+      return NextResponse.json({ ok: true, order_id: existingLog.order_id });
+    }
 
     const supa = supabaseAdmin();
-    const { data, error } = await supa
+
+    // Reserva la key en audit_logs para prevenir carreras
+    const auditInsert = await supa
+      .from('audit_logs')
+      .insert({
+        type: CREATE_ORDER_EVENT,
+        idempotency_key: idempotencyKey,
+        payload: { request: parsed.data },
+      })
+      .select('id')
+      .single();
+
+    if (auditInsert.error) {
+      if (auditInsert.error.code === '23505') {
+        // Ya existe -> regresa lo almacenado
+        const retryLog = await fetchExistingLog(idempotencyKey);
+        if (retryLog?.order_id) {
+          const retryResponse = retryLog.payload?.response;
+          if (retryResponse) {
+            return NextResponse.json(retryResponse);
+          }
+          return NextResponse.json({ ok: true, order_id: retryLog.order_id });
+        }
+      }
+      throw new Error(auditInsert.error.message);
+    }
+
+    const auditId = auditInsert.data?.id as string | undefined;
+    if (!auditId) {
+      throw new Error('No se pudo crear el registro de auditoría');
+    }
+
+    const { customer, service, deliveryZone, notes, totals, items } = parsed.data;
+
+    const orderInsert = await supa
       .from('orders')
       .insert({
         customer_name: customer.name,
@@ -149,12 +247,46 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (orderInsert.error) {
+      throw new Error(orderInsert.error.message);
     }
 
-    return NextResponse.json({ id: data.id });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+    const orderId = orderInsert.data?.id as string | undefined;
+    if (!orderId) {
+      throw new Error('No se pudo obtener el ID de la orden');
+    }
+
+    const itemsPayload = items.map((item) => ({
+      order_id: orderId,
+      slot: item.slot,
+      name: item.name,
+      price_cents: item.price.cents,
+    }));
+
+    if (itemsPayload.length > 0) {
+      const itemsInsert = await supa.from('order_items').insert(itemsPayload);
+      if (itemsInsert.error) {
+        await supa.from('orders').delete().eq('id', orderId).limit(1);
+        throw new Error(itemsInsert.error.message);
+      }
+    }
+
+    const responsePayload: AuditResponsePayload = { ok: true, order_id: orderId };
+
+    await supa
+      .from('audit_logs')
+      .update({
+        order_id: orderId,
+        payload: {
+          request: parsed.data,
+          response: responsePayload,
+        },
+      })
+      .eq('id', auditId);
+
+    return NextResponse.json(responsePayload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
