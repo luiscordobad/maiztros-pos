@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
 
 const allowedStatus = ['pending', 'in_progress', 'ready', 'delivered'] as const;
+type OrderStatus = (typeof allowedStatus)[number];
+
+const isOrderStatus = (value: unknown): value is OrderStatus =>
+  typeof value === 'string' && allowedStatus.includes(value as OrderStatus);
 
 type UpdateStatusPayload = {
   status?: unknown;
@@ -22,10 +26,11 @@ export async function PATCH(request: Request, context: RouteParams) {
     }
 
     const body = (await request.json()) as UpdateStatusPayload;
-    const status = typeof body.status === 'string' ? body.status : '';
-    if (!allowedStatus.includes(status)) {
+    if (!isOrderStatus(body.status)) {
       return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
     }
+
+    const status = body.status;
 
     const timestamps: Record<string, string | null> = {};
     if (status === 'in_progress') timestamps.prepared_at = new Date().toISOString();
@@ -36,7 +41,7 @@ export async function PATCH(request: Request, context: RouteParams) {
       .from('orders')
       .select('status')
       .eq('id', orderId)
-      .single<{ status: string }>();
+      .single<{ status: OrderStatus }>();
 
     if (prevError || !prev) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
