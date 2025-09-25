@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
 
-type RouteParams = { params: Promise<{ id: string }> };
+type RouteParams = {
+  params?: Promise<{ id?: string }> | { id?: string };
+};
 
 export async function POST(_: Request, context: RouteParams) {
   try {
-    const params = (await context.params) ?? {};
-    const orderId = params.id;
+    const rawParams = context.params ?? {};
+    const params = await Promise.resolve(rawParams);
+    const orderId = params?.id;
     if (!orderId) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
     }
