@@ -171,6 +171,8 @@ async function fetchExistingLog(key: string): Promise<AuditLogRow | null> {
 }
 
 export async function POST(req: NextRequest) {
+  let auditId: string | null = null;
+  let orderId: string | null = null;
   try {
     const rawKey = req.headers.get(IDEMPOTENCY_HEADER);
     const idempotencyKey = normalizeIdempotencyKey(rawKey);
@@ -186,12 +188,18 @@ export async function POST(req: NextRequest) {
 
     // Verifica si ya existe una respuesta previa para la misma key
     const existingLog = await fetchExistingLog(idempotencyKey);
-    if (existingLog?.order_id) {
+    if (existingLog) {
       const existingResponse = existingLog.payload?.response;
+      if (existingLog.order_id && existingResponse) {
+        return NextResponse.json(existingResponse);
+      }
+      if (existingLog.order_id) {
+        return NextResponse.json({ ok: true, order_id: existingLog.order_id });
+      }
       if (existingResponse) {
         return NextResponse.json(existingResponse);
       }
-      return NextResponse.json({ ok: true, order_id: existingLog.order_id });
+      return NextResponse.json({ error: 'Orden en proceso' }, { status: 409 });
     }
 
     const supa = supabaseAdmin();
@@ -209,20 +217,26 @@ export async function POST(req: NextRequest) {
 
     if (auditInsert.error) {
       if (auditInsert.error.code === '23505') {
-        // Ya existe -> regresa lo almacenado
+        // Ya existe -> regresa lo almacenado o indica que sigue en proceso
         const retryLog = await fetchExistingLog(idempotencyKey);
-        if (retryLog?.order_id) {
+        if (retryLog) {
           const retryResponse = retryLog.payload?.response;
+          if (retryLog.order_id && retryResponse) {
+            return NextResponse.json(retryResponse);
+          }
+          if (retryLog.order_id) {
+            return NextResponse.json({ ok: true, order_id: retryLog.order_id });
+          }
           if (retryResponse) {
             return NextResponse.json(retryResponse);
           }
-          return NextResponse.json({ ok: true, order_id: retryLog.order_id });
         }
+        return NextResponse.json({ error: 'Orden en proceso' }, { status: 409 });
       }
       throw new Error(auditInsert.error.message);
     }
 
-    const auditId = auditInsert.data?.id as string | undefined;
+    auditId = auditInsert.data?.id as string | undefined;
     if (!auditId) {
       throw new Error('No se pudo crear el registro de auditoría');
     }
@@ -251,7 +265,7 @@ export async function POST(req: NextRequest) {
       throw new Error(orderInsert.error.message);
     }
 
-    const orderId = orderInsert.data?.id as string | undefined;
+    orderId = orderInsert.data?.id as string | undefined;
     if (!orderId) {
       throw new Error('No se pudo obtener el ID de la orden');
     }
@@ -267,13 +281,14 @@ export async function POST(req: NextRequest) {
       const itemsInsert = await supa.from('order_items').insert(itemsPayload);
       if (itemsInsert.error) {
         await supa.from('orders').delete().eq('id', orderId).limit(1);
+        orderId = null;
         throw new Error(itemsInsert.error.message);
       }
     }
 
     const responsePayload: AuditResponsePayload = { ok: true, order_id: orderId };
 
-    await supa
+    const auditUpdate = await supa
       .from('audit_logs')
       .update({
         order_id: orderId,
@@ -284,9 +299,20 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', auditId);
 
+    if (auditUpdate.error) {
+      throw new Error(auditUpdate.error.message);
+    }
+
     return NextResponse.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'error';
+    if (auditId && !orderId) {
+      try {
+        await supabaseAdmin().from('audit_logs').delete().eq('id', auditId).limit(1);
+      } catch (cleanupError) {
+        console.error('No se pudo limpiar audit_log fallido', cleanupError);
+      }
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
