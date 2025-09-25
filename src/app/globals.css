@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --accent: 24 64% 26%;
+  --accent-foreground: 33 100% 96%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 24 100% 50%;
+  --radius: 0.75rem;
+  --brand-green: #00A36C;
+  --brand-orange: #FF7A00;
+  --brand-brown: #6B4423;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 220 18% 9%;
+    --foreground: 0 0% 100%;
+    --muted: 220 14% 18%;
+    --muted-foreground: 214 32% 80%;
+    --popover: 220 18% 9%;
+    --popover-foreground: 0 0% 100%;
+    --card: 220 18% 9%;
+    --card-foreground: 0 0% 100%;
+    --border: 220 14% 22%;
+    --input: 220 14% 22%;
+    --secondary: 220 14% 18%;
+    --secondary-foreground: 0 0% 100%;
+    --accent: 24 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --ring: 24 100% 50%;
+  }
+}
+
+body {
+  margin: 0;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-atma), system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.btn-primary {
+  background: var(--brand-orange);
+  color: #fff;
+}
+
+.selection-active {
+  outline: 3px solid var(--brand-green);
+}
+
+.text-accent {
+  color: var(--brand-brown);
+}
+
+.card {
+  background: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border));
+  padding: 1.5rem;
+  box-shadow: 0 12px 40px -28px rgba(0, 0, 0, 0.45);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: hsl(var(--border));
+  }
+}
