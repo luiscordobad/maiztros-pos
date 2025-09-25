@@ -34,17 +34,18 @@ function OrderTrackingInner() {
     const load = async () => {
       try {
         const response = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
-        const json = await response.json();
+        const json: { order?: OrderRecord; error?: string } = await response.json();
         if (!response.ok) {
           throw new Error(json.error || 'No encontrada');
         }
         if (active) {
-          setOrder(json.order as OrderRecord);
+          setOrder(json.order ?? null);
           setErr(null);
         }
-      } catch (e: any) {
+      } catch (error) {
         if (active) {
-          setErr(e.message || 'Error al cargar la orden');
+          const message = error instanceof Error ? error.message : 'Error al cargar la orden';
+          setErr(message);
         }
       }
     };

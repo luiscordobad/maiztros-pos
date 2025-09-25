@@ -2,17 +2,27 @@
 import { useEffect, useState } from 'react';
 
 type Status = 'queued'|'in_kitchen'|'ready'|'delivered';
+type PaymentStatus = 'pending' | 'paid' | 'failed';
+
+interface KdsOrder {
+  id: string;
+  status: Status;
+  payment_status: PaymentStatus;
+  customer_name: string | null;
+  total_cents: number | null;
+  created_at: string;
+}
 
 export default function KDS() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<KdsOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     try {
       const r = await fetch('/api/orders/kds', { cache: 'no-store' });
-      const j = await r.json();
+      const j: { orders?: KdsOrder[]; error?: string } = await r.json();
       if (!r.ok) throw new Error(j.error || 'Error KDS');
-      setOrders(j.orders || []);
+      setOrders(j.orders ?? []);
     } catch (e) {
       console.error(e);
     } finally {

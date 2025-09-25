@@ -101,18 +101,28 @@ export default function POS() {
 
     setIsPersisting(true);
     try {
+      const idempotencyKey =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`;
       const response = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify(payload),
       });
 
-      const json = await response.json();
+      const json: { id?: string; error?: string } = await response.json();
       if (!response.ok) {
         throw new Error(json.error || 'No se pudo crear la orden');
       }
+      if (!json.id) {
+        throw new Error('Respuesta sin ID de orden');
+      }
       setOrderId(json.id);
-      return json.id as string;
+      return json.id;
     } finally {
       setIsPersisting(false);
     }
@@ -141,8 +151,9 @@ export default function POS() {
       } else {
         throw new Error(data.error || 'No se pudo generar el link de pago');
       }
-    } catch (e: any) {
-      alert('Error en pago: ' + (e.message || 'Error desconocido'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      alert('Error en pago: ' + message);
     } finally {
       setIsPaying(false);
     }

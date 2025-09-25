@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
+import { createSupabaseServiceRoleClient } from '@/lib/supabaseServer';
+import { mexicoCityNowISO } from '@/lib/timeMx';
 
-function supabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRole) {
-    throw new Error('Supabase admin credentials are not configured.');
-  }
-  return createClient(url, serviceRole);
-}
+const IDEMPOTENCY_HEADER = 'idempotency-key';
 
 const ALLOWED_SERVICES: ReadonlyArray<OrderPayload['service']> = ['dine_in', 'pickup', 'delivery'];
 const ALLOWED_DELIVERY_ZONES: ReadonlyArray<NonNullable<OrderPayload['deliveryZone']>> = ['zibata', 'fuera'];
@@ -120,6 +115,24 @@ const parseOrderPayload = (body: unknown): { data?: OrderPayload; error?: string
   return { data: payload };
 };
 
+const getIdempotencyKey = (req: NextRequest): string | null => {
+  const direct = req.headers.get(IDEMPOTENCY_HEADER);
+  if (direct && direct.trim()) {
+    return direct.trim();
+  }
+
+  const prefixed = req.headers.get(`x-${IDEMPOTENCY_HEADER}`);
+  if (prefixed && prefixed.trim()) {
+    return prefixed.trim();
+  }
+
+  return null;
+};
+
+const hashPayload = (payload: OrderPayload): string => {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
@@ -128,9 +141,79 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error ?? 'Datos inválidos' }, { status: 400 });
     }
 
+    const idempotencyKey = getIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'Falta encabezado Idempotency-Key' }, { status: 400 });
+    }
+
+    const supa = createSupabaseServiceRoleClient();
+    const requestHash = hashPayload(parsed.data);
+    const nowIso = mexicoCityNowISO();
+
+    const { data: existingRequest, error: existingError } = await supa
+      .from('order_requests')
+      .select('id, order_id, request_hash')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (existingError) {
+      return NextResponse.json({ error: existingError.message }, { status: 500 });
+    }
+
+    if (existingRequest) {
+      if (existingRequest.request_hash !== requestHash) {
+        return NextResponse.json({ error: 'Conflicto de idempotencia' }, { status: 409 });
+      }
+
+      if (existingRequest.order_id) {
+        await supa
+          .from('order_requests')
+          .update({ last_used_at: nowIso })
+          .eq('id', existingRequest.id);
+
+        return NextResponse.json({ id: existingRequest.order_id });
+      }
+
+      return NextResponse.json({ error: 'Solicitud duplicada en progreso' }, { status: 409 });
+    }
+
+    const { data: insertedRequest, error: insertError } = await supa
+      .from('order_requests')
+      .insert({
+        idempotency_key: idempotencyKey,
+        request_hash: requestHash,
+        payload: parsed.data,
+        created_at: nowIso,
+        last_used_at: nowIso,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        const { data: retry, error: retryError } = await supa
+          .from('order_requests')
+          .select('id, order_id, request_hash')
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle();
+
+        if (retryError) {
+          return NextResponse.json({ error: retryError.message }, { status: 500 });
+        }
+
+        if (retry && retry.request_hash === requestHash && retry.order_id) {
+          return NextResponse.json({ id: retry.order_id });
+        }
+
+        return NextResponse.json({ error: 'Conflicto de idempotencia' }, { status: 409 });
+      }
+
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    const orderRequestId = insertedRequest.id;
     const { customer, service, deliveryZone, notes, totals } = parsed.data;
 
-    const supa = supabaseAdmin();
     const { data, error } = await supa
       .from('orders')
       .insert({
@@ -153,8 +236,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    await supa
+      .from('order_requests')
+      .update({ order_id: data.id, last_used_at: mexicoCityNowISO() })
+      .eq('id', orderRequestId);
+
     return NextResponse.json({ id: data.id });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
