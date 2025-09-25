@@ -8,12 +8,15 @@ type UpdateStatusPayload = {
   status?: unknown;
 };
 
-type RouteParams = { params: Promise<{ id: string }> };
+type RouteParams = {
+  params?: { id: string } | Promise<{ id: string }>;
+};
 
 export async function PATCH(request: Request, context: RouteParams) {
   try {
-    const params = (await context.params) ?? {};
-    const orderId = params.id;
+    const rawParams = context?.params;
+    const resolvedParams = rawParams instanceof Promise ? await rawParams : rawParams;
+    const orderId = resolvedParams?.id;
     if (!orderId) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
     }
