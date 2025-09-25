@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OrderStatus } from '@/types/order';
+import type { Database } from '@/types/supabase';
 
-type SupabaseAdminClient = SupabaseClient<Record<string, unknown>>;
+type SupabaseAdminClient = SupabaseClient<Database>;
 
 type OrderStatusLiteRow = {
   status: OrderStatus;
@@ -17,7 +18,7 @@ function supabaseAdmin(): SupabaseAdminClient {
   if (!url || !serviceRole) {
     throw new Error('Supabase admin credentials are not configured.');
   }
-  return createClient<unknown>(url, serviceRole, {
+  return createClient<Database>(url, serviceRole, {
     auth: { persistSession: false },
   });
 }

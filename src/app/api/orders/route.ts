@@ -3,25 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Money, OrderItem, OrderPayload, Totals } from '@/types/order';
+import type {
+  AuditResponsePayload,
+  Database,
+} from '@/types/supabase';
 
-type AuditResponsePayload = { ok: true; order_id: string };
-type AuditPayload = {
-  request?: OrderPayload;
-  response?: AuditResponsePayload;
-} | null;
-
-type AuditLogRow = {
-  id: string;
-  order_id: string | null;
-  payload: AuditPayload;
-};
+type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
 
 type MaybeSingle<T> = {
   data: T | null;
   error: { message: string; code?: string } | null;
 };
 
-type SupabaseAdminClient = SupabaseClient<unknown>;
+type SupabaseAdminClient = SupabaseClient<Database>;
 
 function supabaseAdmin(): SupabaseAdminClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,7 +23,7 @@ function supabaseAdmin(): SupabaseAdminClient {
   if (!url || !serviceRole) {
     throw new Error('Supabase admin credentials are not configured.');
   }
-  return createClient<unknown>(url, serviceRole, {
+  return createClient<Database>(url, serviceRole, {
     auth: { persistSession: false },
   });
 }
