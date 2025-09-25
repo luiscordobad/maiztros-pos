@@ -10,18 +10,33 @@ export async function GET() {
       .order('created_at', { ascending: true });
     if (error) throw new Error(error.message);
 
-    const orders = (data ?? []).map((order: any) => ({
+    type OrderItemRow = { name: string; qty: number };
+    type OrderRow = {
+      id: string;
+      ticket_no: number | null;
+      channel: string;
+      status: string;
+      created_at: string;
+      ready_at: string | null;
+      order_items: OrderItemRow[] | null;
+    };
+
+    const rows = Array.isArray(data) ? (data as OrderRow[]) : [];
+    const orders = rows.map((order) => ({
       id: order.id,
       ticket_no: order.ticket_no,
       channel: order.channel,
       status: order.status,
       created_at: order.created_at,
       ready_at: order.ready_at,
-      items: (order.order_items ?? []).map((item: any) => ({ name: item.name, qty: item.qty })),
+      items: Array.isArray(order.order_items)
+        ? order.order_items.map((item) => ({ name: item.name, qty: item.qty }))
+        : [],
     }));
 
     return NextResponse.json({ orders });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message ?? 'No se pudieron cargar las órdenes' }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No se pudieron cargar las órdenes';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

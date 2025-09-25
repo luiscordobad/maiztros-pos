@@ -5,7 +5,7 @@ interface AuditLogParams {
   action: string;
   entity: string;
   entity_id: string | null;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export async function logAudit({ actor, action, entity, entity_id, meta }: AuditLogParams) {
@@ -14,7 +14,7 @@ export async function logAudit({ actor, action, entity, entity_id, meta }: Audit
     action,
     entity,
     entity_id,
-    meta: meta ? JSON.stringify(meta) : null,
+    meta: meta ?? null,
   });
   if (error) {
     console.error('audit log error', error.message);

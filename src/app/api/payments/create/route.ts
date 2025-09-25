@@ -2,12 +2,19 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/api/supabaseAdmin';
 import { logAudit } from '@/lib/api/audit';
 
+type CreatePaymentPayload = {
+  orderId?: unknown;
+  amount?: unknown;
+  provider?: unknown;
+  cashReceived?: unknown;
+};
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const orderId = String(body.orderId ?? '');
+    const body = (await request.json()) as CreatePaymentPayload;
+    const orderId = typeof body.orderId === 'string' ? body.orderId : '';
     const amount = Number(body.amount ?? 0);
-    const provider = String(body.provider ?? 'cash');
+    const provider = typeof body.provider === 'string' ? body.provider : 'cash';
     const cashReceived = Number(body.cashReceived ?? 0);
 
     if (!orderId) {
@@ -25,15 +32,17 @@ export async function POST(request: Request) {
     });
     if (error) throw new Error(error.message);
 
-    await supabaseAdmin
+    const { error: orderUpdateError } = await supabaseAdmin
       .from('orders')
       .update({ payment_method: provider, status: 'ready', ready_at: new Date().toISOString() })
       .eq('id', orderId);
+    if (orderUpdateError) throw new Error(orderUpdateError.message);
 
     await logAudit({ actor: null, action: 'PAYMENT_CAPTURED', entity: 'payment', entity_id: orderId, meta: { provider, amount, cashReceived } });
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message ?? 'No se pudo registrar el pago' }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No se pudo registrar el pago';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

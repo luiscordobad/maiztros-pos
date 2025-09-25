@@ -13,7 +13,8 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     await logAudit({ actor: null, action: 'STATUS_CHANGE', entity: 'order', entity_id: params.id, meta: { status: 'delivered' } });
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message ?? 'No se pudo actualizar' }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No se pudo actualizar';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

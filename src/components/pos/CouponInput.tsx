@@ -30,14 +30,18 @@ export function CouponInput({ orderId }: CouponInputProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-      const json = await response.json();
+      const json = (await response.json()) as Partial<{ error: string; discount_cents: number; code: string }>;
       if (!response.ok) {
         setError(json.error ?? 'No se pudo aplicar el cupón');
         return;
       }
-      applyDiscount(json.discount_cents, json.code);
-    } catch (err: any) {
-      setError(err.message ?? 'Error inesperado');
+      if (typeof json.discount_cents === 'number' && typeof json.code === 'string') {
+        applyDiscount(json.discount_cents, json.code);
+      } else {
+        setError('Respuesta inválida del servidor');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setLoading(false);
     }

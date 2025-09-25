@@ -123,8 +123,9 @@ export async function POST(request: Request) {
     await logAudit({ actor: null, action: 'CREATE_ORDER', entity: 'order', entity_id: orderId, meta: { channel: body.channel } });
 
     return NextResponse.json({ id: orderId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return NextResponse.json({ error: error.message ?? 'Error desconocido' }, { status: 400 });
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

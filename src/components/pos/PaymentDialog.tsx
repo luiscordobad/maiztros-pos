@@ -32,7 +32,7 @@ export function PaymentDialog({ orderId, total, onPaid }: PaymentDialogProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId, amount: total, cashReceived: amount, provider: method }),
       });
-      const json = await response.json();
+      const json = (await response.json()) as Partial<{ error?: string; qr_url?: string }>;
       if (!response.ok) {
         setError(json.error ?? 'No se pudo registrar el pago');
         return;
@@ -46,8 +46,8 @@ export function PaymentDialog({ orderId, total, onPaid }: PaymentDialogProps) {
       }
       onPaid();
       setOpen(false);
-    } catch (err: any) {
-      setError(err.message ?? 'Error inesperado');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setLoading(false);
     }
