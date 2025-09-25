@@ -1,70 +1,50 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
 
-const MP_API = 'https://api.mercadopago.com';
+import { createClient } from '@/lib/supabaseServer';
 
-// Supabase admin (service role) solo en servidor
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+export async function POST(req: NextRequest) {
+  const supa = createClient();
+  const payload = await req.json().catch(() => ({}));
+  const type = payload?.type || payload?.action;
 
-// MP manda distinto formato según configuración: topic/type + id / data.id.
-// Soportamos ambos.
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get('secret');
-  const topic = searchParams.get('topic') || searchParams.get('type'); // payment
-  const id = searchParams.get('id') || searchParams.get('data.id');
-
-  if (!secret || secret !== process.env.MP_WEBHOOK_SECRET) {
-    return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 });
-  }
-  if (!topic || !id) {
-    return NextResponse.json({ ok: false, error: 'missing params' }, { status: 400 });
-  }
-
-  try {
-    if (topic !== 'payment') {
-      // Ignora otros tópicos
-      return NextResponse.json({ ok: true });
-    }
-
-    // Consulta el pago
-    const payRes = await fetch(`${MP_API}/v1/payments/${id}`, {
-      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
+  if (type === 'payment' && payload?.data?.id) {
+    const paymentId = payload.data.id;
+    const pRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN!}` },
     });
-    if (!payRes.ok) {
-      const t = await payRes.text();
-      return NextResponse.json({ ok: false, error: t }, { status: 502 });
-    }
-    const payment = await payRes.json();
+    if (!pRes.ok) return NextResponse.json({ ok: true });
+    const p = await pRes.json();
 
-    // Solo si está aprobado
-    if (payment.status === 'approved') {
-      const externalRef = payment.external_reference as string | null; // aquí viene tu orderId
-      if (externalRef) {
-        const supa = supabaseAdmin();
-        // Marca la orden como pagada
-        const { error } = await supa
-          .from('orders')
-          .update({ payment_status: 'paid' })
-          .eq('id', externalRef)         // <- tu orderId debe ser el id UUID de orders
-          .limit(1);
-
-        if (error) {
-          // Loguea el error pero responde 200 para que MP no reintente infinito
-          console.error('Supabase update error:', error);
-        }
+    let order_id: string | null = p?.metadata?.order_id ?? null;
+    if (!order_id) {
+      const prefId = p?.order?.id;
+      if (prefId) {
+        const { data: sess } = await supa
+          .from('payment_sessions')
+          .select('order_id')
+          .eq('preference_id', prefId)
+          .maybeSingle();
+        order_id = sess?.order_id ?? null;
       }
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    console.error('MP webhook error:', e);
-    // Aun así responde 200 para evitar tormenta de reintentos si es un bug temporal
-    return NextResponse.json({ ok: true });
+    if (order_id) {
+      const status = p.status;
+      await supa.from('payment_sessions').update({ status }).eq('order_id', order_id);
+      if (status === 'approved') {
+        await supa.from('payments').insert({
+          order_id,
+          provider: 'mp',
+          amount: p.transaction_amount,
+          status: 'approved',
+          ext_ref: String(paymentId),
+        });
+        await supa
+          .from('orders')
+          .update({ paid_at: new Date().toISOString() })
+          .eq('id', order_id);
+      }
+    }
   }
+  return NextResponse.json({ ok: true });
 }
