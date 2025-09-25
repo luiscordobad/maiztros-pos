@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.env*
+pnpm-lock.yaml
+yarn.lock
+.DS_Store
+supabase/.branches
+supabase/.temp
+
