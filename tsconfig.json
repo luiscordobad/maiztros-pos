@@ -19,6 +19,12 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
+      "@/lib": [
+        "./src/lib"
+      ],
+      "@/lib/*": [
+        "./src/lib/*"
+      ],
       "@/*": [
         "./*"
       ]
